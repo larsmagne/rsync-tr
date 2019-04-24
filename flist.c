@@ -88,6 +88,9 @@ extern int filesfrom_convert;
 extern iconv_t ic_send, ic_recv;
 #endif
 
+extern char *tr_opt, *tr_left, *tr_right;
+extern int tr_right_len;
+
 #define PTR_SIZE (sizeof (struct file_struct *))
 
 int io_error;
@@ -650,6 +653,23 @@ static void send_file_entry(int f, const char *fname, struct file_struct *file,
 		stats.total_size += F_LENGTH(file);
 }
 
+static void transliterate(char *thisname) {
+	char *p1, *p2, *pleft;
+
+	for (p1 = p2 = thisname; *p1; p1++) {
+		/* Look up the current character in the left string. */
+		pleft = strchr(tr_left, *p1);
+		if (!pleft)
+			/* Not found: no change. */
+			*p2++ = *p1;
+		else if (pleft - tr_left < tr_right_len)
+			/* Store replacement from the right string. */
+			*p2++ = tr_right[pleft - tr_left];
+		/* Otherwise delete. */
+	}
+	*p2 = '\0';
+}
+
 static struct file_struct *recv_file_entry(int f, struct file_list *flist, int xflags)
 {
 	static int64 modtime;
@@ -717,6 +737,9 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 		thisname[outbuf.len] = '\0';
 	}
 #endif
+
+	if (tr_opt)
+		transliterate(thisname);
 
 	if (*thisname
 	 && (clean_fname(thisname, CFN_REFUSE_DOT_DOT_DIRS) < 0 || (!relative_paths && *thisname == '/'))) {

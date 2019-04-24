@@ -463,6 +463,7 @@ to the detailed description below for a complete description.  verb(
      --read-batch=FILE       read a batched update from FILE
      --protocol=NUM          force an older protocol version to be used
      --iconv=CONVERT_SPEC    request charset conversion of filenames
+     --tr=BAD/GOOD           transliterate filenames
      --checksum-seed=NUM     set block/file checksum seed (advanced)
  -4, --ipv4                  prefer IPv4
  -6, --ipv6                  prefer IPv6
@@ -2666,6 +2667,22 @@ Note that rsync does not do any conversion of names in filter files
 specifying matching rules that can match on both sides of the transfer.
 For instance, you can specify extra include/exclude rules if there are
 filename differences on the two sides that need to be accounted for.
+
+dit(bf(--tr=BAD/GOOD)) Transliterates filenames on the receiver, after the
+iconv conversion (if any).  This can be used to remove characters illegal
+on the destination filesystem.  If you use this option, consider saving a
+"find . -ls" listing of the source in the destination to help you determine
+the original filenames in case of need.
+
+The argument consists of a string of characters to remove, optionally
+followed by a slash and a string of corresponding characters with which to
+replace them.  The second string may be shorter, in which case any leftover
+characters in the first string are simply deleted.  For example,
+bf(--tr=:\/!) replaces colons with exclamation marks and deletes backslashes.
+Slashes cannot be transliterated because it would cause havoc.
+
+If the receiver is invoked over a remote shell, use bf(--protect-args) to
+stop the shell from interpreting any nasty characters in the argument.
 
 When you pass an bf(--iconv) option to an rsync daemon that allows it, the
 daemon uses the charset specified in its "charset" configuration parameter

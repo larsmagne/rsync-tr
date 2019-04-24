@@ -201,6 +201,8 @@ int need_unsorted_flist = 0;
 #ifdef ICONV_OPTION
 char *iconv_opt = ICONV_OPTION;
 #endif
+char *tr_opt = NULL, *tr_left = NULL, *tr_right = NULL;
+int tr_right_len = 0;
 
 struct chmod_mode_struct *chmod_modes = NULL;
 
@@ -804,6 +806,7 @@ void usage(enum logcode F)
   rprintf(F,"     --iconv=CONVERT_SPEC    request charset conversion of filenames\n");
 #endif
   rprintf(F,"     --checksum-seed=NUM     set block/file checksum seed (advanced)\n");
+  rprintf(F,"     --tr=BAD/GOOD           transliterate filenames\n");
   rprintf(F," -4, --ipv4                  prefer IPv4\n");
   rprintf(F," -6, --ipv6                  prefer IPv6\n");
   rprintf(F,"     --version               print version number\n");
@@ -1024,6 +1027,7 @@ static struct poptOption long_options[] = {
   {"iconv",            0,  POPT_ARG_STRING, &iconv_opt, 0, 0, 0 },
   {"no-iconv",         0,  POPT_ARG_NONE,   0, OPT_NO_ICONV, 0, 0 },
 #endif
+  {"tr",               0,  POPT_ARG_STRING, &tr_opt, 0, 0, 0 },
   {"ipv4",            '4', POPT_ARG_VAL,    &default_af_hint, AF_INET, 0, 0 },
   {"ipv6",            '6', POPT_ARG_VAL,    &default_af_hint, AF_INET6, 0, 0 },
   {"8-bit-output",    '8', POPT_ARG_VAL,    &allow_8bit_chars, 1, 0, 0 },
@@ -2368,6 +2372,30 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		}
 	}
 
+	/* Easiest way to get a local server right is to do this on both sides */
+	if (tr_opt) {
+		if (*tr_opt) {
+			char *p;
+
+			/* Our mutation shouldn't interfere with transmission of the
+			 * original option to the server. */
+			tr_left = strdup(tr_opt);
+			p = strchr(tr_left, '/');
+			if (p != NULL) {
+				*p = '\0';
+				p++;
+				tr_right = p;
+				tr_right_len = strlen(tr_right);
+				if (strchr(tr_right, '/') != NULL) {
+					snprintf(err_buf, sizeof err_buf,
+						"--tr cannot transliterate slashes\n");
+					return 0;
+				}
+			}
+		} else
+			tr_opt = NULL;
+	}
+
 	am_starting_up = 0;
 
 	return 1;
@@ -2800,6 +2828,12 @@ void server_options(char **args, int *argc_p)
 		args[ac++] = "--remove-source-files";
 	else if (remove_source_files)
 		args[ac++] = "--remove-sent-files";
+
+	if (tr_opt && am_sender) {
+		if (asprintf(&arg, "--tr=%s", tr_opt) < 0)
+			goto oom;
+		args[ac++] = arg;
+	}
 
 	if (preallocate_files && am_sender)
 		args[ac++] = "--preallocate";
